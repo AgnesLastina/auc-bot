@@ -1,22 +1,20 @@
 const mongoose = require('mongoose');
 
-const auctionDraftSchema = new mongoose.Schema({
-    telegramId: { type: String, required: true },
+const AuctionDraftSchema = new mongoose.Schema({
+  telegramId: Number,
 
-    step: { type: String, default: 'title' },
+  title: String,
+  description: String,
+  startPrice: Number,
+  bidStep: Number,
+  endTime: String,
 
-    title: String,
-    description: String,
-    startPrice: String,
-    bidStep: String,
-    endTime: String,
+  photoFileId: String,
 
-    photoFileId: String,
-
-    createdAt: {
-        type: Date,
-        default: Date.now
-    }
+  step: {
+    type: String,
+    default: 'title'
+  }
 });
 
-module.exports = mongoose.model('AuctionDraft', auctionDraftSchema);
+module.exports = mongoose.model('AuctionDraft', AuctionDraftSchema);

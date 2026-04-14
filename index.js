@@ -4,46 +4,28 @@ const TelegramBot = require('node-telegram-bot-api');
 const mongoose = require('mongoose');
 const auctionHandler = require('./handlers/auctionHandler');
 
-// =========================
-// 🚀 CONNECT DB FIRST
-// =========================
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log('MongoDB подключена ✅');
     startBot();
   })
-  .catch(err => {
-    console.log('Ошибка MongoDB:', err);
-  });
+  .catch(err => console.log(err));
 
-// =========================
-// 🤖 START BOT
-// =========================
 function startBot() {
 
   const bot = new TelegramBot(process.env.BOT_TOKEN, {
     polling: true
   });
 
-  // /start
-  bot.onText(/\/start/, async (msg) => {
-    try {
-      await bot.sendMessage(
-        msg.chat.id,
-        'Привет! Я бот для создания аукционов 🤖\n\nНапиши /auction чтобы начать.'
-      );
-    } catch (err) {
-      console.log('START ERROR:', err);
-    }
+  bot.onText(/\/start/, (msg) => {
+    bot.sendMessage(msg.chat.id,
+      'Привет 🤖\n\n/auction — создать аукцион'
+    );
   });
 
-  // auction system
   auctionHandler(bot);
 
-  // errors
-  bot.on('polling_error', (err) => {
-    console.log('Polling error:', err.code);
-  });
+  bot.on('polling_error', console.log);
 
   console.log('Бот запущен 🤖');
 }
