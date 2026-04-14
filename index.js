@@ -10,13 +10,11 @@ const auctionHandler = require('./handlers/auctionHandler');
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log('MongoDB подключена ✅');
-
     startBot();
   })
   .catch(err => {
     console.log('Ошибка MongoDB:', err);
   });
-
 
 // =========================
 // 🤖 START BOT
@@ -27,9 +25,7 @@ function startBot() {
     polling: true
   });
 
-  // =========================
-  // 🧠 SAFE /START
-  // =========================
+  // /start
   bot.onText(/\/start/, async (msg) => {
     try {
       await bot.sendMessage(
@@ -41,14 +37,10 @@ function startBot() {
     }
   });
 
-  // =========================
-  // 📦 PLUG AUCTION SYSTEM
-  // =========================
+  // auction system
   auctionHandler(bot);
 
-  // =========================
-  // 🛡 GLOBAL SAFETY CATCH
-  // =========================
+  // errors
   bot.on('polling_error', (err) => {
     console.log('Polling error:', err.code);
   });
