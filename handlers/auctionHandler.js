@@ -2,9 +2,6 @@ const AuctionDraft = require('../models/AuctionDraft');
 
 module.exports = function (bot) {
 
-    // =========================
-    // START AUCTION
-    // =========================
     bot.onText(/\/auction/, async (msg) => {
         await AuctionDraft.findOneAndDelete({ telegramId: msg.from.id });
 
@@ -18,9 +15,6 @@ module.exports = function (bot) {
     });
 
 
-    // =========================
-    // CANCEL COMMAND
-    // =========================
     bot.onText(/\/cancel/, async (msg) => {
         await AuctionDraft.findOneAndDelete({ telegramId: msg.from.id });
 
@@ -28,9 +22,6 @@ module.exports = function (bot) {
     });
 
 
-    // =========================
-    // FSM
-    // =========================
     bot.on('message', async (msg) => {
 
         const chatId = msg.chat.id;
@@ -42,20 +33,13 @@ module.exports = function (bot) {
         if (!draft) return;
         if (text.startsWith('/')) return;
 
-        // =========================
-        // PHOTO RECEIVED
-        // =========================
         if (msg.photo) {
-
             draft.photoFileId = msg.photo[msg.photo.length - 1].file_id;
             await draft.save();
 
             return sendPreview(bot, chatId, draft, msg.from);
         }
 
-        // =========================
-        // STEPS
-        // =========================
         switch (draft.step) {
 
             case 'title':
@@ -71,26 +55,42 @@ module.exports = function (bot) {
                 return bot.sendMessage(chatId, 'Введите стартовую цену:');
 
             case 'startPrice':
-                draft.startPrice = text;
+                if (!isValidPositiveNumber(text)) {
+                    return bot.sendMessage(chatId, '❌ Введите корректную стартовую цену (положительное число)');
+                }
+
+                draft.startPrice = Number(text);
                 draft.step = 'bidStep';
                 await draft.save();
                 return bot.sendMessage(chatId, 'Введите шаг ставки:');
 
             case 'bidStep':
-                draft.bidStep = text;
+                if (!isValidPositiveNumber(text)) {
+                    return bot.sendMessage(chatId, '❌ Введите корректный шаг ставки (положительное число)');
+                }
+
+                draft.bidStep = Number(text);
                 draft.step = 'endTime';
                 await draft.save();
-                return bot.sendMessage(chatId, 'Введите время окончания:');
+                return bot.sendMessage(
+                    chatId,
+                    'Введите время окончания в формате:\nДД.MM.ГГГГ ЧЧ:ММ\n\nПример: 25.04.2026 18:30'
+                );
 
             case 'endTime':
+                if (!isValidDateTime(text)) {
+                    return bot.sendMessage(
+                        chatId,
+                        '❌ Неверный формат даты.\nИспользуй:\nДД.MM.ГГГГ ЧЧ:ММ'
+                    );
+                }
+
                 draft.endTime = text;
                 draft.step = 'photo';
                 await draft.save();
                 return bot.sendMessage(chatId, 'Отправьте фото 📸');
 
-            // =========================
-            // EDITING MODES
-            // =========================
+
             case 'edit_title':
                 draft.title = text;
                 draft.step = 'photo';
@@ -104,18 +104,33 @@ module.exports = function (bot) {
                 return sendPreview(bot, chatId, draft, msg.from);
 
             case 'edit_startPrice':
-                draft.startPrice = text;
+                if (!isValidPositiveNumber(text)) {
+                    return bot.sendMessage(chatId, '❌ Введите корректную цену');
+                }
+
+                draft.startPrice = Number(text);
                 draft.step = 'photo';
                 await draft.save();
                 return sendPreview(bot, chatId, draft, msg.from);
 
             case 'edit_bidStep':
-                draft.bidStep = text;
+                if (!isValidPositiveNumber(text)) {
+                    return bot.sendMessage(chatId, '❌ Введите корректный шаг ставки');
+                }
+
+                draft.bidStep = Number(text);
                 draft.step = 'photo';
                 await draft.save();
                 return sendPreview(bot, chatId, draft, msg.from);
 
             case 'edit_endTime':
+                if (!isValidDateTime(text)) {
+                    return bot.sendMessage(
+                        chatId,
+                        '❌ Неверный формат даты.\nИспользуй:\nДД.MM.ГГГГ ЧЧ:ММ'
+                    );
+                }
+
                 draft.endTime = text;
                 draft.step = 'photo';
                 await draft.save();
@@ -124,9 +139,6 @@ module.exports = function (bot) {
     });
 
 
-    // =========================
-    // CALLBACKS
-    // =========================
     bot.on('callback_query', async (query) => {
 
         await bot.answerCallbackQuery(query.id);
@@ -143,14 +155,7 @@ module.exports = function (bot) {
 
         try {
 
-            // =========================
-            // SEND TO ADMIN
-            // =========================
             if (data === 'send') {
-
-                if (!draft.photoFileId) {
-                    return bot.sendMessage(chatId, 'Нет фото ❌');
-                }
 
                 const postText = `
 🔥 АУКЦИОН 🔥
@@ -176,21 +181,13 @@ module.exports = function (bot) {
                 await AuctionDraft.deleteOne({ telegramId: userId });
             }
 
-            // =========================
-            // CANCEL
-            // =========================
             if (data === 'cancel') {
-
                 await AuctionDraft.deleteOne({ telegramId: userId });
 
                 await bot.sendMessage(chatId, 'Аукцион отменён ❌');
             }
 
-            // =========================
-            // EDIT MENU
-            // =========================
             if (data === 'edit') {
-
                 return bot.sendMessage(chatId, 'Что изменить?', {
                     reply_markup: {
                         inline_keyboard: [
@@ -204,40 +201,61 @@ module.exports = function (bot) {
                 });
             }
 
-            // =========================
-            // SET EDIT STATES
-            // =========================
             if (data.startsWith('edit_')) {
 
                 draft.step = data;
                 await draft.save();
 
-                const fieldNames = {
+                const prompts = {
                     edit_title: 'Введите новое название:',
                     edit_description: 'Введите новое описание:',
                     edit_startPrice: 'Введите новую стартовую цену:',
                     edit_bidStep: 'Введите новый шаг ставки:',
-                    edit_endTime: 'Введите новое время окончания:'
+                    edit_endTime: 'Введите новое время окончания (ДД.MM.ГГГГ ЧЧ:ММ):'
                 };
 
-                return bot.sendMessage(chatId, fieldNames[data]);
+                return bot.sendMessage(chatId, prompts[data]);
             }
 
         } catch (err) {
-
             console.log('REAL ERROR:', err);
 
-            await bot.sendMessage(
-                chatId,
-                'Ошибка: ' + (err.message || 'unknown error')
-            );
+            await bot.sendMessage(chatId, 'Ошибка: ' + err.message);
         }
     });
 };
 
 
 // =========================
-// PREVIEW FUNCTION
+// HELPERS
+// =========================
+function isValidPositiveNumber(value) {
+    return !isNaN(value) && Number(value) > 0;
+}
+
+function isValidDateTime(value) {
+    const regex = /^\d{2}\.\d{2}\.\d{4}\s\d{2}:\d{2}$/;
+
+    if (!regex.test(value)) return false;
+
+    const [datePart, timePart] = value.split(' ');
+    const [day, month, year] = datePart.split('.').map(Number);
+    const [hour, minute] = timePart.split(':').map(Number);
+
+    const date = new Date(year, month - 1, day, hour, minute);
+
+    return (
+        date.getFullYear() === year &&
+        date.getMonth() === month - 1 &&
+        date.getDate() === day &&
+        date.getHours() === hour &&
+        date.getMinutes() === minute
+    );
+}
+
+
+// =========================
+// PREVIEW
 // =========================
 async function sendPreview(bot, chatId, draft, user) {
 
@@ -254,18 +272,14 @@ async function sendPreview(bot, chatId, draft, user) {
 🆔 ${user.id}
     `;
 
-    if (draft.photoFileId) {
-        return bot.sendPhoto(chatId, draft.photoFileId, {
-            caption: preview,
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: '✅ Отправить', callback_data: 'send' }],
-                    [{ text: '✏️ Изменить', callback_data: 'edit' }],
-                    [{ text: '❌ Отмена', callback_data: 'cancel' }]
-                ]
-            }
-        });
-    }
-
-    return bot.sendMessage(chatId, preview);
+    return bot.sendPhoto(chatId, draft.photoFileId, {
+        caption: preview,
+        reply_markup: {
+            inline_keyboard: [
+                [{ text: '✅ Отправить', callback_data: 'send' }],
+                [{ text: '✏️ Изменить', callback_data: 'edit' }],
+                [{ text: '❌ Отмена', callback_data: 'cancel' }]
+            ]
+        }
+    });
 }
