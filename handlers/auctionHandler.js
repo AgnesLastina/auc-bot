@@ -77,19 +77,18 @@ module.exports = function (bot) {
                     'Введите время окончания в формате:\nДД.MM.ГГГГ ЧЧ:ММ\n\nПример: 25.04.2026 18:30'
                 );
 
-            case 'endTime':
-                if (!isValidDateTime(text)) {
-                    return bot.sendMessage(
-                        chatId,
-                        '❌ Неверный формат даты.\nИспользуй:\nДД.MM.ГГГГ ЧЧ:ММ'
-                    );
+            case 'endTime': {
+                const validation = validateFutureDateTime(text);
+
+                if (!validation.valid) {
+                    return bot.sendMessage(chatId, `❌ ${validation.error}`);
                 }
 
                 draft.endTime = text;
                 draft.step = 'photo';
                 await draft.save();
                 return bot.sendMessage(chatId, 'Отправьте фото 📸');
-
+            }
 
             case 'edit_title':
                 draft.title = text;
@@ -123,18 +122,18 @@ module.exports = function (bot) {
                 await draft.save();
                 return sendPreview(bot, chatId, draft, msg.from);
 
-            case 'edit_endTime':
-                if (!isValidDateTime(text)) {
-                    return bot.sendMessage(
-                        chatId,
-                        '❌ Неверный формат даты.\nИспользуй:\nДД.MM.ГГГГ ЧЧ:ММ'
-                    );
+            case 'edit_endTime': {
+                const validation = validateFutureDateTime(text);
+
+                if (!validation.valid) {
+                    return bot.sendMessage(chatId, `❌ ${validation.error}`);
                 }
 
                 draft.endTime = text;
                 draft.step = 'photo';
                 await draft.save();
                 return sendPreview(bot, chatId, draft, msg.from);
+            }
         }
     });
 
@@ -233,10 +232,15 @@ function isValidPositiveNumber(value) {
     return !isNaN(value) && Number(value) > 0;
 }
 
-function isValidDateTime(value) {
+function validateFutureDateTime(value) {
     const regex = /^\d{2}\.\d{2}\.\d{4}\s\d{2}:\d{2}$/;
 
-    if (!regex.test(value)) return false;
+    if (!regex.test(value)) {
+        return {
+            valid: false,
+            error: 'Неверный формат даты. Используй ДД.MM.ГГГГ ЧЧ:ММ'
+        };
+    }
 
     const [datePart, timePart] = value.split(' ');
     const [day, month, year] = datePart.split('.').map(Number);
@@ -244,13 +248,28 @@ function isValidDateTime(value) {
 
     const date = new Date(year, month - 1, day, hour, minute);
 
-    return (
+    const isRealDate =
         date.getFullYear() === year &&
         date.getMonth() === month - 1 &&
         date.getDate() === day &&
         date.getHours() === hour &&
-        date.getMinutes() === minute
-    );
+        date.getMinutes() === minute;
+
+    if (!isRealDate) {
+        return {
+            valid: false,
+            error: 'Указана несуществующая дата'
+        };
+    }
+
+    if (date <= new Date()) {
+        return {
+            valid: false,
+            error: 'Дата окончания должна быть в будущем'
+        };
+    }
+
+    return { valid: true };
 }
 
 
