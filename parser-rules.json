@@ -1,0 +1,39 @@
+{
+  "wikiUrl": "https://horse-life-wiki-roblox.fandom.com",
+  "pages": {
+    "potions": {
+      "title": "Potions",
+      "method": "spanId",
+      "pattern": "<span id=\"([^\"]+)\">([^<]+)<\\/span>",
+      "filter": "Potion",
+      "group": 2
+    },
+    "horses": {
+      "title": "Species",
+      "method": "category",
+      "categoryName": "Species",
+      "excludePatterns": ["File:", "Template:", "Category:"]
+    },
+    "hats": { "title": "Category:Hat", "method": "category", "categoryName": "Hat" },
+    "head": { "title": "Category:Head", "method": "category", "categoryName": "Head" },
+    "mouth": { "title": "Category:Mouth", "method": "category", "categoryName": "Mouth" },
+    "saddle": { "title": "Category:Saddle", "method": "category", "categoryName": "Saddle" },
+    "legs": { "title": "Category:Leg", "method": "category", "categoryName": "Leg" },
+    "tail": { "title": "Category:Tail", "method": "category", "categoryName": "Tail" },
+    "flair": { "title": "Category:Flair", "method": "category", "categoryName": "Flair" },
+    "wings": {
+      "title": "Wings",
+      "method": "wikitext",
+      "pattern": "\\.(?:webp|png|jpg)\\s*\\|\\s*([^\\|<]+?)\\s*(?:<ref|$|Model)",
+      "filter": "Wings",
+      "group": 1
+    }
+  },
+  "cleaning": {
+    "removePrefixes": ["File:"],
+    "removeSuffixes": ["Showcase", "Flair", " Model", " Model 1", " Model 2", " Model 3", " Above View", " Side View", " Topology", " Underside"],
+    "removeExtensions": [".png", ".jpg", ".jpeg", ".gif", ".webp"],
+    "replaceUnderscores": true,
+    "minLength": 2
+  }
+}

@@ -1,2 +1,40 @@
-node_modules
+# ===== Node.js =====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# ===== Переменные окружения =====
 .env
+.env.local
+.env.*.local
+
+# ===== Сессии и логи =====
+session.json
+logs/
+*.log
+.~session.json
+
+# ===== Временные файлы =====
+tmp/
+temp/
+*.tmp
+*.bak
+
+# ===== IDE =====
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ===== ОС =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== Прочее =====
+structure.txt
+wings-wikitext.txt
+draft.txt
+eng.traineddata
