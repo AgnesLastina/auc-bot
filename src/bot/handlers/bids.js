@@ -3,7 +3,9 @@ const Auction = require('../../db/models/Auction');
 const User = require('../../db/models/User');
 const auctionService = require('../../services/auction.service');
 const notificationService = require('../../services/notification.service');
+const schedulerService = require('../../services/scheduler.service');
 const config = require('../../config');
+const { parsePrice } = require('../../utils/validators');
 const { Markup } = require('telegraf');
 
 console.log('bids.js loaded!');
@@ -145,7 +147,7 @@ const handleCancelBid = async (ctx, auctionId) => {
     await auction.save();
 
     await ctx.reply('✅ Ваша ставка отменена');
-    await updateChannelPost(auction);
+    await schedulerService.updateChannelPost(auction);
 
   } catch (error) {
     console.error('Cancel bid error:', error);
@@ -333,7 +335,7 @@ bot.on('text', async (ctx, next) => {
   }
 
   const text = ctx.message.text;
-  const amount = parseFloat(text.replace(/[кk]/g, '000').replace(/[^\d.]/g, ''));
+  const amount = parsePrice(text);
 
   if (isNaN(amount) || amount <= 0) {
     await ctx.reply('❌ Введите корректную сумму!');
@@ -348,14 +350,14 @@ bot.on('text', async (ctx, next) => {
       return;
     }
 
-    const currentBid = auction.currentBid || parseFloat(auction.data.startPrice?.replace(/[кk]/g, '000').replace(/[^\d.]/g, '')) || 0;
-    const minStep = parseFloat(auction.data.minStep?.replace(/[кk]/g, '000').replace(/[^\d.]/g, '')) || 1;
+    const currentBid = auction.currentBid || parsePrice(auction.data.startPrice) || 0;
+    const minStep = parsePrice(auction.data.minStep) || 1;
 
     const hasBuyout = auction.data.autoBuyout === 'да' && auction.data.autoBuyoutPrice;
     let buyoutPrice = 0;
 
     if (hasBuyout) {
-      buyoutPrice = parseFloat(auction.data.autoBuyoutPrice.replace(/[кk]/g, '000').replace(/[^\d.]/g, '')) || 0;
+      buyoutPrice = parsePrice(auction.data.autoBuyoutPrice);
     }
 
     if (hasBuyout && amount >= buyoutPrice) {
@@ -406,7 +408,7 @@ bot.on('text', async (ctx, next) => {
     await ctx.reply(`✅ Ваша ставка ${text} принята!`);
 
     await notificationService.notifyNewBid(auction, previousLeader);
-    await updateChannelPost(auction);
+    await schedulerService.updateChannelPost(auction);
 
     delete ctx.session.biddingAuctionId;
 
@@ -431,7 +433,7 @@ async function confirmBuyout(ctx, auctionId) {
     await ctx.reply('🎉 Поздравляем! Вы выкупили лот!');
 
     await notificationService.notifyAuctionEnded(auction);
-    await updateChannelPost(auction, true);
+    await schedulerService.updateChannelPost(auction);
 
     delete ctx.session.buyoutAuctionId;
     delete ctx.session.pendingBuyoutConfirm;
@@ -444,134 +446,9 @@ async function confirmBuyout(ctx, auctionId) {
   }
 }
 
-// ============ ОБНОВЛЕНИЕ ПОСТА В КАНАЛЕ ============
-async function updateChannelPost(auction, isBuyout = false) {
-  console.log('Updating channel post. channelMessageId:', auction.channelMessageId, 'auctionId:', auction._id);
-
-  if (!auction.channelMessageId) {
-    console.log('No channelMessageId, skipping update');
-    return;
-  }
-
-  try {
-    const { formatHorseTemplate, formatAccessoryTemplate, formatPotionTemplate } = require('../../utils/helpers');
-
-    const seller = await User.findOne({ telegramId: auction.userId });
-    const sellerInfo = seller ? { username: seller.username, telegramId: seller.telegramId } : null;
-
-    let template;
-    const leader = auction.currentLeader ? `@${auction.currentLeader.username || 'нет'} (${auction.currentLeader.userId})` : '________';
-    const displayBid = auction.currentBidDisplay || auction.currentBid || auction.data.startPrice || '0';
-
-    if (auction.category === 'horse') {
-      template = formatHorseTemplate({ ...auction.data, currentBid: displayBid, leader }, sellerInfo, true);
-    } else if (auction.category === 'accessory') {
-      template = formatAccessoryTemplate({ ...auction.data, currentBid: displayBid, leader }, sellerInfo, true);
-    } else {
-      template = formatPotionTemplate({ ...auction.data, currentBid: displayBid, leader }, sellerInfo, true);
-    }
-
-    if (isBuyout || auction.status === 'ended' || auction.status === 'cancelled') {
-      if (auction.currentLeader) {
-        template += `\n\n🏆 *Аукцион завершён*\nПобедитель: @${auction.currentLeader.username || 'нет'} (${auction.currentLeader.userId})\nСумма: ${displayBid}`;
-      } else {
-        template += `\n\n❌ *Аукцион завершён без ставок*`;
-      }
-    }
-
-    const botUsername = (await bot.telegram.getMe()).username;
-
-    const buttons = [];
-    
-    if (auction.status === 'active') {
-      buttons.push([Markup.button.url('💰 Ставка', `https://t.me/${botUsername}?start=bid_${auction._id}`)]);
-      buttons.push([Markup.button.url('🔔 Отслеживать', `https://t.me/${botUsername}?start=watch_${auction._id}`)]);
-      
-      if (auction.data.autoBuyout === 'да' && auction.data.autoBuyoutPrice) {
-        buttons.push([Markup.button.url(`⚡ Выкупить (${auction.data.autoBuyoutPrice})`, `https://t.me/${botUsername}?start=buyout_${auction._id}`)]);
-      }
-      
-      if (auction.category === 'horse' && auction.data.paramPhotos && auction.data.paramPhotos.length > 0) {
-        buttons.push([Markup.button.url('📋 Параметры', `https://t.me/${botUsername}?start=params_${auction._id}`)]);
-      }
-    } else {
-      if (auction.category === 'horse' && auction.data.paramPhotos && auction.data.paramPhotos.length > 0) {
-        buttons.push([Markup.button.url('📋 Параметры', `https://t.me/${botUsername}?start=params_${auction._id}`)]);
-      }
-    }
-
-    const keyboard = Markup.inlineKeyboard(buttons);
-
-    // Для постов с фото — пересоздаем
-    if (auction.data.mainPhoto) {
-      try {
-        await bot.telegram.editMessageCaption(
-          config.CHANNEL_ID,
-          auction.channelMessageId,
-          null,
-          template,
-          { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
-        );
-        console.log('Channel post caption updated');
-      } catch (e) {
-        console.log('Failed to edit caption, recreating post:', e.message);
-        try {
-          await bot.telegram.deleteMessage(config.CHANNEL_ID, auction.channelMessageId).catch(() => {});
-          
-          const newMsg = await bot.telegram.sendPhoto(config.CHANNEL_ID, auction.data.mainPhoto, {
-            caption: template,
-            parse_mode: 'HTML',
-            reply_markup: keyboard.reply_markup
-          });
-          
-          auction.channelMessageId = newMsg.message_id;
-          const chatId = config.CHANNEL_ID.toString().replace('-100', '');
-          auction.channelPostUrl = `https://t.me/c/${chatId}/${newMsg.message_id}`;
-          await auction.save();
-          console.log('Channel post recreated with photo, new ID:', newMsg.message_id);
-        } catch (e2) {
-          console.log('Failed to recreate photo post:', e2.message);
-        }
-      }
-    } else {
-      try {
-        await bot.telegram.editMessageText(
-          config.CHANNEL_ID,
-          auction.channelMessageId,
-          null,
-          template,
-          { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
-        );
-        console.log('Channel post text updated');
-      } catch (e) {
-        console.log('Failed to edit text, recreating post:', e.message);
-        try {
-          await bot.telegram.deleteMessage(config.CHANNEL_ID, auction.channelMessageId).catch(() => {});
-          
-          const newMsg = await bot.telegram.sendMessage(config.CHANNEL_ID, template, {
-            parse_mode: 'HTML',
-            reply_markup: keyboard.reply_markup
-          });
-          
-          auction.channelMessageId = newMsg.message_id;
-          const chatId = config.CHANNEL_ID.toString().replace('-100', '');
-          auction.channelPostUrl = `https://t.me/c/${chatId}/${newMsg.message_id}`;
-          await auction.save();
-          console.log('Channel post recreated, new ID:', newMsg.message_id);
-        } catch (e2) {
-          console.log('Failed to recreate post:', e2.message);
-        }
-      }
-    }
-  } catch (e) {
-    console.log('Error in updateChannelPost:', e.message);
-  }
-}
-
 module.exports = {
   handleBid,
   handleWatch,
   handleCancelBid,
-  handleBuyout,
-  updateChannelPost
+  handleBuyout
 };
