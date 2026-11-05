@@ -8,7 +8,7 @@ const AuctionDraft = require('../../db/models/AuctionDraft');
 const ModerationLog = require('../../db/models/ModerationLog');
 const moment = require('moment');
 const config = require('../../config');
-const { updateChannelPost } = require('../handlers/bids');
+const schedulerService = require('../../services/scheduler.service');
 const { Markup } = require('telegraf');
 
 // ========== AUTO-DELETE + KEYBOARD ==========
