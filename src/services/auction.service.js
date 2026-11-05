@@ -3,6 +3,7 @@ const Auction = require('../db/models/Auction');
 const User = require('../db/models/User');
 const config = require('../config');
 const { formatHorseTemplate, formatAccessoryTemplate, formatPotionTemplate } = require('../utils/helpers');
+const { parsePrice } = require('../utils/validators');
 const { Markup } = require('telegraf');
 
 class AuctionService {
@@ -10,7 +11,6 @@ class AuctionService {
     this.bot = null;
   }
 
-  // ✅ Метод для внедрения бота (устранение циклической зависимости)
   setBot(bot) {
     this.bot = bot;
   }
@@ -185,7 +185,6 @@ class AuctionService {
     await AuctionDraft.findByIdAndDelete(draftId);
   }
 
-  // ✅ Основной метод
   async sendForRevision(draftId, comment) {
     const draft = await AuctionDraft.findById(draftId);
     if (!draft) throw new Error('Draft not found');
@@ -197,7 +196,6 @@ class AuctionService {
     return draft;
   }
 
-  // ✅ Алиас — чтобы admin.js мог вызывать sendToRevision
   async sendToRevision(draftId, comment) {
     return this.sendForRevision(draftId, comment);
   }
@@ -242,7 +240,7 @@ class AuctionService {
     if (auction.data.autoBuyout !== 'да') throw new Error('Автовыкуп недоступен');
 
     const buyoutPriceDisplay = auction.data.autoBuyoutPrice;
-    const buyoutPrice = parseFloat(buyoutPriceDisplay.replace(/[кk]/g, '000').replace(/[^\d.]/g, '')) || 0;
+    const buyoutPrice = parsePrice(buyoutPriceDisplay);
 
     auction.status = 'ended';
     auction.endedBy = 'buyout';
