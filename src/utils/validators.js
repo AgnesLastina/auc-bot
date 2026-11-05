@@ -1,7 +1,7 @@
 const moment = require('moment');
 
 const validatePrice = (value) => {
-  const pattern = /^\d+(\.\d+)?[кk]?$/i;
+  const pattern = /^\d+([.,]\d+)?[кk]?$/i;
   return pattern.test(value.trim());
 };
 
@@ -35,8 +35,24 @@ const validateEndDate = (dateStr) => {
 };
 
 const parsePrice = (priceStr) => {
-  const cleaned = priceStr.toLowerCase().replace(/[кk]$/, '000').replace(/[^\d.]/g, '');
-  return parseFloat(cleaned) || 0;
+  if (!priceStr) return 0;
+  
+  let clean = String(priceStr).toLowerCase().trim().replace(/\s+/g, '');
+  clean = clean.replace(/,/g, '.');
+
+  const hasK = clean.endsWith('к') || clean.endsWith('k');
+  if (hasK) {
+    clean = clean.slice(0, -1);
+  }
+
+  let amount = parseFloat(clean);
+  if (isNaN(amount)) return 0;
+
+  if (hasK) {
+    amount *= 1000;
+  }
+
+  return amount;
 };
 
 const formatPrice = (price) => {
