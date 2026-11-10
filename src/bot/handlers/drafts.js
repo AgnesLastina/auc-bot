@@ -26,10 +26,7 @@ async function showDraftsList(ctx, userId) {
 
   for (let i = 0; i < drafts.length; i++) {
     const d = drafts[i];
-    const cat = d.category === 'horse' ? '🐴 Лошадь'
-      : d.category === 'accessory' ? '💍 Аксессуар'
-      : '🧪 Зелье';
-
+    const cat = d.category === 'horse' ? '🐴 Лошадь' : d.category === 'accessory' ? '💍 Аксессуар' : '🧪 Зелье';
     const name = d.data.name || d.data.species || 'Без названия';
     const status = d.status === 'needs_revision' ? '✏️ требует доработки' : '📝 черновик';
     const date = moment(d.createdAt).format('DD.MM.YYYY HH:mm');
@@ -67,7 +64,6 @@ bot.action('show_drafts', async (ctx) => {
 bot.action(/^draft_continue_(.+)$/, async (ctx) => {
   const draftId = ctx.match[1];
   const draft = await AuctionDraft.findById(draftId);
-
   await ctx.answerCbQuery();
 
   if (!draft || draft.userId !== ctx.from.id) {
@@ -94,7 +90,6 @@ bot.action(/^draft_continue_(.+)$/, async (ctx) => {
 bot.action(/^draft_delete_(.+)$/, async (ctx) => {
   const draftId = ctx.match[1];
   const draft = await AuctionDraft.findById(draftId);
-
   await ctx.answerCbQuery();
 
   if (!draft || draft.userId !== ctx.from.id) {
@@ -103,7 +98,6 @@ bot.action(/^draft_delete_(.+)$/, async (ctx) => {
   }
 
   await AuctionDraft.findByIdAndDelete(draftId);
-
   try { await ctx.deleteMessage(); } catch (e) {}
   await showDraftsList(ctx, ctx.from.id);
 });
