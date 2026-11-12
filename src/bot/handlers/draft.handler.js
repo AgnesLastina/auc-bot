@@ -41,56 +41,36 @@ async function updateDraftField(ctx, draftId, data, keepState = false) {
 
     if (mainPhoto) {
       const msg = await ctx.telegram.sendPhoto(ctx.chat.id, mainPhoto, {
-        caption: template,
-        parse_mode: 'HTML',
-        reply_markup: keyboard.reply_markup
+        caption: template, parse_mode: 'HTML', reply_markup: keyboard.reply_markup
       });
       nid = msg.message_id;
     } else {
       const msg = await ctx.telegram.sendMessage(ctx.chat.id, template, {
-        parse_mode: 'HTML',
-        reply_markup: keyboard.reply_markup
+        parse_mode: 'HTML', reply_markup: keyboard.reply_markup
       });
       nid = msg.message_id;
     }
-
     stateManager.updateState(ctx, { templateMessageId: nid });
   } else {
     if (state.templateMessageId) {
       try {
         if (draft.data.mainPhoto) {
           ctx.telegram.deleteMessage(ctx.chat.id, state.templateMessageId).catch(() => {});
-
           const msg = await ctx.telegram.sendPhoto(ctx.chat.id, draft.data.mainPhoto, {
-            caption: template,
-            parse_mode: 'HTML',
-            reply_markup: keyboard.reply_markup
+            caption: template, parse_mode: 'HTML', reply_markup: keyboard.reply_markup
           });
           stateManager.updateState(ctx, { templateMessageId: msg.message_id });
         } else {
-          await ctx.telegram.editMessageText(
-            ctx.chat.id,
-            state.templateMessageId,
-            null,
-            template,
-            { parse_mode: 'HTML', reply_markup: keyboard.reply_markup }
-          );
+          await ctx.telegram.editMessageText(ctx.chat.id, state.templateMessageId, null, template, { parse_mode: 'HTML', reply_markup: keyboard.reply_markup });
         }
       } catch (e) {
         if (!e.message?.includes('not modified')) {
-          const msg = await ctx.telegram.sendMessage(ctx.chat.id, template, {
-            parse_mode: 'HTML',
-            reply_markup: keyboard.reply_markup
-          });
+          const msg = await ctx.telegram.sendMessage(ctx.chat.id, template, { parse_mode: 'HTML', reply_markup: keyboard.reply_markup });
           stateManager.updateState(ctx, { templateMessageId: msg.message_id });
         }
       }
     }
   }
-
-  if (!keepState) {
-    stateManager.clearAwaitingInput(ctx);
-  }
+  if (!keepState) stateManager.clearAwaitingInput(ctx);
 }
-
 module.exports = { updateDraftField };
