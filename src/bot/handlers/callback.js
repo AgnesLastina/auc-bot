@@ -1633,7 +1633,6 @@ async function compareWithTemplate(imageBuffers, templateData, category = 'horse
 
 module.exports = {
   showAuctionTemplate,
-  updateDraftField,
   sendToAdminChat,
   runVerification,
   checkLanguage,
