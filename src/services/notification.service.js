@@ -8,39 +8,58 @@ const escapeHtml = (text) => {
 };
 
 async function safeSendMessage(userId, message, keyboard = null) {
+  const textLen = message ? message.length : 0;
+  console.log(`\n========================================`);
+  console.log(`[NOTIFY DEBUG] Попытка отправки сообщения`);
+  console.log(`[NOTIFY DEBUG] Получатель (userId): ${userId} (Тип: ${typeof userId})`);
+  console.log(`[NOTIFY DEBUG] Длина текста: ${textLen} символов`);
+  console.log(`[NOTIFY DEBUG] Наличие кнопок: ${keyboard ? 'ДА' : 'НЕТ'}`);
+  
   if (!userId) {
-    console.error('❌ ОШИБКА УВЕДОМЛЕНИЯ: userId отсутствует (undefined/null)');
+    console.error('❌ [NOTIFY DEBUG] ОШИБКА: userId равен null или undefined!');
     return;
   }
 
   try {
+    // Пытаемся отправить с кнопками (если они есть)
     if (keyboard) {
+      console.log(`[NOTIFY DEBUG] Отправка с кнопками...`);
       try {
-        console.log(`[Notify] Попытка отправки с кнопками для ${userId}...`);
-        await bot.telegram.sendMessage(userId, message, { 
+        const res = await bot.telegram.sendMessage(userId, message, { 
           parse_mode: 'HTML', disable_web_page_preview: true, reply_markup: keyboard.reply_markup 
         });
+        console.log(`✅ [NOTIFY DEBUG] УСПЕХ! Сообщение с кнопками доставлено. Message ID: ${res.message_id}`);
       } catch (err) {
+        console.log(`⚠️ [NOTIFY DEBUG] Ошибка при отправке с кнопками: ${err.message}`);
+        
+        // Если проблема в кнопках (приватность), пробуем без них
         if (err.message.includes('BUTTON_USER_PRIVACY_RESTRICTED') || err.message.includes('BUTTON_URL_INVALID')) {
-          console.log(`[Notify] Ошибка приватности кнопок для ${userId}. Отправляем без кнопок...`);
-          await bot.telegram.sendMessage(userId, message, { parse_mode: 'HTML', disable_web_page_preview: true });
+          console.log(`[NOTIFY DEBUG] Проблема с кнопками (приватность). Пробуем отправить текст без кнопок...`);
+          const res2 = await bot.telegram.sendMessage(userId, message, { parse_mode: 'HTML', disable_web_page_preview: true });
+          console.log(`✅ [NOTIFY DEBUG] УСПЕХ! Текст без кнопок доставлен. Message ID: ${res2.message_id}`);
         } else {
-          throw err;
+          throw err; // Если это другая ошибка (например, бот заблокирован) - пробрасываем наверх
         }
       }
     } else {
-      console.log(`[Notify] Попытка отправки без кнопок для ${userId}...`);
-      await bot.telegram.sendMessage(userId, message, { parse_mode: 'HTML', disable_web_page_preview: true });
+      // Отправляем просто текст
+      console.log(`[NOTIFY DEBUG] Отправка без кнопок...`);
+      const res = await bot.telegram.sendMessage(userId, message, { parse_mode: 'HTML', disable_web_page_preview: true });
+      console.log(`✅ [NOTIFY DEBUG] УСПЕХ! Сообщение без кнопок доставлено. Message ID: ${res.message_id}`);
     }
-    console.log(`✅ Уведомление УСПЕШНО доставлено пользователю ${userId}`);
   } catch (e) {
-    console.error(`❌ КРИТИЧЕСКАЯ ОШИБКА ОТПРАВКИ для ${userId}:`, e.message);
+    // Сюда мы попадаем, если отправка провалилась полностью
+    console.error(`❌ [NOTIFY DEBUG] КРИТИЧЕСКАЯ ОШИБКА ОТПРАВКИ!`);
+    console.error(`[NOTIFY DEBUG] Причина: ${e.message}`);
+    console.error(`[NOTIFY DEBUG] Код ошибки: ${e.code || 'нет кода'}`);
   }
+  console.log(`========================================\n`);
 }
 
 class NotificationService {
   async notifyNewBid(auction, previousLeader) {
-    console.log(`[Notify] Вызов notifyNewBid. Продавец: ${auction.userId}`);
+    console.log(`\n🔥 [BID DEBUG] Ставка обновлена. ID аукциона: ${auction._id}`);
+    console.log(`🔥 [BID DEBUG] Владелец аукциона (кому шлем уведомление): ${auction.userId}`);
     
     const displayAmount = auction.currentBidDisplay || auction.currentBid;
     const auctionLink = auction.channelPostUrl || '';
