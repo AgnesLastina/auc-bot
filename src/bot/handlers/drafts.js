@@ -1,4 +1,3 @@
-const bot = require('../bot');
 const AuctionDraft = require('../../db/models/AuctionDraft');
 const stateManager = require('../../fsm/state.manager');
 const keyboards = require('../keyboards/main');
@@ -32,30 +31,30 @@ async function showDraftsList(ctx, userId) {
   stateManager.addTempMessage(ctx, msg.message_id);
 }
 
-bot.action('show_drafts', async (ctx) => { await ctx.answerCbQuery(); await showDraftsList(ctx, ctx.from.id); });
-
-bot.action(/^draft_continue_(.+)$/, async (ctx) => {
-  const draft = await AuctionDraft.findById(ctx.match[1]);
-  await ctx.answerCbQuery();
-  if (!draft || draft.userId !== ctx.from.id) return ctx.reply('❌ Черновик не найден');
-  await deleteMessages(ctx, stateManager.getTempMessages(ctx));
-  stateManager.clearTempMessages(ctx);
-  try { await ctx.deleteMessage(); } catch (e) {}
-  stateManager.createAuctionState(ctx, draft.category);
-  stateManager.updateState(ctx, { draftId: draft._id, category: draft.category, manualMode: draft.data.isManualFill || false });
-  const { showAuctionTemplate } = require('./callback');
-  await showAuctionTemplate(ctx, draft.category, draft, ctx.from.id);
-});
-
-bot.action(/^draft_delete_(.+)$/, async (ctx) => {
-  const draft = await AuctionDraft.findById(ctx.match[1]);
-  await ctx.answerCbQuery();
-  if (!draft || draft.userId !== ctx.from.id) return ctx.reply('❌ Черновик не найден');
-  await AuctionDraft.findByIdAndDelete(ctx.match[1]);
-  try { await ctx.deleteMessage(); } catch (e) {}
-  await showDraftsList(ctx, ctx.from.id);
-});
-
-bot.action('draft_new', async (ctx) => { await ctx.answerCbQuery(); try { await ctx.deleteMessage(); } catch (e) {} const msg = await ctx.reply('Выберите категорию нового аукциона:', keyboards.categoryKeyboard()); stateManager.addTempMessage(ctx, msg.message_id); });
-bot.action('draft_close', async (ctx) => { await ctx.answerCbQuery(); try { await ctx.deleteMessage(); } catch (e) {} await ctx.reply('📋 Главное меню', keyboards.mainMenuKeyboard(config.ADMIN_IDS.includes(ctx.from.id))); });
-module.exports = { showDraftsList };
+module.exports = (bot) => {
+  bot.action('show_drafts', async (ctx) => { await ctx.answerCbQuery(); await showDraftsList(ctx, ctx.from.id); });
+  bot.action(/^draft_continue_(.+)$/, async (ctx) => {
+    const draft = await AuctionDraft.findById(ctx.match[1]);
+    await ctx.answerCbQuery();
+    if (!draft || draft.userId !== ctx.from.id) return ctx.reply('❌ Черновик не найден');
+    await deleteMessages(ctx, stateManager.getTempMessages(ctx));
+    stateManager.clearTempMessages(ctx);
+    try { await ctx.deleteMessage(); } catch (e) {}
+    stateManager.createAuctionState(ctx, draft.category);
+    stateManager.updateState(ctx, { draftId: draft._id, category: draft.category, manualMode: draft.data.isManualFill || false });
+    const { showAuctionTemplate } = require('./callback')(bot);
+    await showAuctionTemplate(ctx, draft.category, draft, ctx.from.id);
+  });
+  bot.action(/^draft_delete_(.+)$/, async (ctx) => {
+    const draft = await AuctionDraft.findById(ctx.match[1]);
+    await ctx.answerCbQuery();
+    if (!draft || draft.userId !== ctx.from.id) return ctx.reply('❌ Черновик не найден');
+    await AuctionDraft.findByIdAndDelete(ctx.match[1]);
+    try { await ctx.deleteMessage(); } catch (e) {}
+    await showDraftsList(ctx, ctx.from.id);
+  });
+  bot.action('draft_new', async (ctx) => { await ctx.answerCbQuery(); try { await ctx.deleteMessage(); } catch (e) {} const msg = await ctx.reply('Выберите категорию нового аукциона:', keyboards.categoryKeyboard()); stateManager.addTempMessage(ctx, msg.message_id); });
+  bot.action('draft_close', async (ctx) => { await ctx.answerCbQuery(); try { await ctx.deleteMessage(); } catch (e) {} await ctx.reply('📋 Главное меню', keyboards.mainMenuKeyboard(config.ADMIN_IDS.includes(ctx.from.id))); });
+  
+  return { showDraftsList };
+};
