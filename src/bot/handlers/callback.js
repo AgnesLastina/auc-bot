@@ -1,4 +1,4 @@
-﻿const bot = require('../bot');
+const bot = require('../bot');
 const auctionService = require('../../services/auction.service');
 const settingsService = require('../../services/settings.service');
 const templateService = require('../../services/template.service');
