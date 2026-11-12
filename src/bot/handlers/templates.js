@@ -35,13 +35,11 @@ async function showTemplatesList(ctx, userId) {
 
 bot.action('show_templates', async (ctx) => { await ctx.answerCbQuery(); await showTemplatesList(ctx, ctx.from.id); });
 bot.action('templates_back', async (ctx) => { await ctx.answerCbQuery(); try { await ctx.deleteMessage(); } catch (e) {} await ctx.reply('📋 Главное меню', keyboards.mainMenuKeyboard(config.ADMIN_IDS.includes(ctx.from.id))); });
-
 bot.action(/^template_use_(.+)$/, async (ctx) => {
   await ctx.answerCbQuery();
   const template = await templateService.getTemplate(ctx.match[1], ctx.from.id);
   if (!template) return ctx.reply('❌ Шаблон не найден');
-  await deleteMessages(ctx, stateManager.getTempMessages(ctx));
-  stateManager.clearTempMessages(ctx);
+  await deleteMessages(ctx, stateManager.getTempMessages(ctx)); stateManager.clearTempMessages(ctx);
   try { await ctx.deleteMessage(); } catch (e) {}
   const draft = await auctionService.createDraft(ctx.from.id, template.category);
   await auctionService.updateDraft(draft._id, { ...template.data, mainPhoto: template.data.mainPhoto || null, paramPhotos: template.data.paramPhotos || [] });
@@ -51,7 +49,6 @@ bot.action(/^template_use_(.+)$/, async (ctx) => {
   const { showAuctionTemplate } = require('./callback');
   await showAuctionTemplate(ctx, (await AuctionDraft.findById(draft._id)).category, await AuctionDraft.findById(draft._id), ctx.from.id);
 });
-
 bot.action(/^template_rename_(.+)$/, async (ctx) => {
   await ctx.answerCbQuery();
   const template = await templateService.getTemplate(ctx.match[1], ctx.from.id);
@@ -60,9 +57,7 @@ bot.action(/^template_rename_(.+)$/, async (ctx) => {
   const msg = await ctx.reply(`✏️ Введите новое имя для шаблона «${template.name}»:`, Markup.inlineKeyboard([[Markup.button.callback('❌ Отмена', 'template_rename_cancel')]]));
   stateManager.addTempMessage(ctx, msg.message_id);
 });
-
 bot.action('template_rename_cancel', async (ctx) => { await ctx.answerCbQuery(); ctx.session.awaitingTemplateRename = null; try { await ctx.deleteMessage(); } catch (e) {} });
-
 bot.on('text', async (ctx, next) => {
   const id = ctx.session?.awaitingTemplateRename; if (!id) return next();
   const text = ctx.message.text; if (!text || text.startsWith('/')) return next();
@@ -72,7 +67,6 @@ bot.on('text', async (ctx, next) => {
   await ctx.reply(`✅ Шаблон переименован в «${t.name}»`);
   await showTemplatesList(ctx, ctx.from.id);
 });
-
 bot.action(/^template_delete_(.+)$/, async (ctx) => {
   await ctx.answerCbQuery();
   const t = await templateService.getTemplate(ctx.match[1], ctx.from.id);
@@ -80,12 +74,10 @@ bot.action(/^template_delete_(.+)$/, async (ctx) => {
   const msg = await ctx.reply(`🗑 Удалить шаблон «${t.name}»?`, Markup.inlineKeyboard([[Markup.button.callback('✅ Да', `template_delete_confirm_${ctx.match[1]}`)], [Markup.button.callback('❌ Нет', 'show_templates')]]));
   stateManager.addTempMessage(ctx, msg.message_id);
 });
-
 bot.action(/^template_delete_confirm_(.+)$/, async (ctx) => {
   await ctx.answerCbQuery('Удалено');
   await templateService.deleteTemplate(ctx.match[1], ctx.from.id);
   try { await ctx.deleteMessage(); } catch (e) {}
   await showTemplatesList(ctx, ctx.from.id);
 });
-
 module.exports = { showTemplatesList };
