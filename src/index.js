@@ -1,3 +1,4 @@
+console.log("🔥 Я ЗАГРУЗИЛ НОВЫЙ КОД С ГИТА! ВРЕМЯ:", new Date().toLocaleTimeString());
 const { connectDB } = require('./db/mongo');
 const bot = require('./bot/bot');
 const logger = require('./utils/logger');
