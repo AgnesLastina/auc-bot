@@ -116,3 +116,56 @@ bot.use(async (ctx, next) => {
       return;
     }
   }
+  if (ctx.message?.text && type === 'text') {
+    try { await ctx.deleteMessage(); } catch (e) {}
+    if (validator === 'mutationSlots') {
+      if (!validators.validateMutationSlots(ctx.message.text)) { const msg = await ctx.reply('❌ Введите корректное значение: "1/3", "2/3", "3/3"!'); stateManager.addTempMessage(ctx, msg.message_id); return; }
+      await updateDraftField(ctx, state.draftId, { mutationSlots: ctx.message.text });
+    } else if (validator === 'price') {
+      if (!validators.validatePrice(ctx.message.text)) { const msg = await ctx.reply('❌ Введите корректную цену!'); stateManager.addTempMessage(ctx, msg.message_id); return; }
+      if (field === 'autoBuyoutPrice') { await updateDraftField(ctx, state.draftId, { autoBuyout: 'да', autoBuyoutPrice: ctx.message.text }); } else { await updateDraftField(ctx, state.draftId, { [field]: ctx.message.text }); }
+    } else if (validator === 'quantity') {
+      if (!validators.validateQuantity(ctx.message.text)) { const msg = await ctx.reply('❌ Введите корректное значение! (1-999)'); stateManager.addTempMessage(ctx, msg.message_id); return; }
+      await updateDraftField(ctx, state.draftId, { [field]: parseInt(ctx.message.text) });
+    } else if (validator === 'reserveDays') {
+      if (!validators.validateReserveDays(ctx.message.text)) { const msg = await ctx.reply('❌ Введите корректное количество дней брони! (1-365)'); stateManager.addTempMessage(ctx, msg.message_id); return; }
+      await updateDraftField(ctx, state.draftId, { reserve: 'да', reserveDays: parseInt(ctx.message.text) });
+    } else if (validator === 'endDate') {
+      if (!validators.validateEndDate(ctx.message.text)) { const msg = await ctx.reply('❌ Неверный формат даты! ДД.ММ.ГГГГ ЧЧ:ММ'); stateManager.addTempMessage(ctx, msg.message_id); return; }
+      const [datePart, timePart] = ctx.message.text.split(' ');
+      const [day, month, year] = datePart.split('.');
+      const [hour, minute] = timePart.split(':');
+      const endDate = moment(`${year}-${month}-${day} ${hour}:${minute}`, 'YYYY-MM-DD HH:mm').utcOffset(3, true).toDate();
+      await updateDraftField(ctx, state.draftId, { endDate, endDateFormatted: ctx.message.text });
+    } else {
+      await updateDraftField(ctx, state.draftId, { [field]: ctx.message.text });
+    }
+    return;
+  }
+  return next();
+});
+
+async function processOcrBatch(ctx, groupData) {
+  const { photos, draftId, category } = groupData;
+  if (!extractAllData) { await bot.telegram.sendMessage(groupData.chatId, '❌ Функция распознавания временно недоступна. Заполните вручную.'); return; }
+  const loadingMsg = await bot.telegram.sendMessage(groupData.chatId, `🔍 Распознаю ${photos.length} фото... Не нажимайте ничего до завершения процесса (5–15 секунд)`);
+  try {
+    const imageBuffers = await downloadImages(bot.telegram, photos);
+    const parsedData = await extractAllData(imageBuffers, category);
+    const missingFields = [];
+    if (category === 'horse') { if (!parsedData.species) missingFields.push('SPECIES'); if (!parsedData.gender) missingFields.push('GENDER'); if (!parsedData.size) missingFields.push('SIZE'); }
+    else if (category === 'accessory') { if (!parsedData.name) missingFields.push('NAME'); if (!parsedData.accessoryType) missingFields.push('TYPE'); }
+    else { if (!parsedData.name) missingFields.push('NAME'); }
+    try { await bot.telegram.deleteMessage(groupData.chatId, loadingMsg.message_id); } catch (e) {}
+    const fakeCtx = { from: { id: groupData.userId }, chat: { id: groupData.chatId }, telegram: bot.telegram, reply: async (text, extra) => bot.telegram.sendMessage(groupData.chatId, text, extra), answerCbQuery: async () => {}, deleteMessage: async () => {} };
+    await showOcrPreview(fakeCtx, draftId, parsedData, missingFields, category);
+    const sessionState = stateManager.getStateByUserId(groupData.userId);
+    if (sessionState) sessionState.awaitingInput = null;
+  } catch (ocrError) {
+    try { await bot.telegram.deleteMessage(groupData.chatId, loadingMsg.message_id); } catch (e) {}
+    await bot.telegram.sendMessage(groupData.chatId, '❌ Не удалось распознать параметры с этих фото.\n\nВы можете:\n• Отправить другие фото\n• Заполнить шаблон вручную — данные будут проверены модерацией', Markup.inlineKeyboard([[Markup.button.callback('✏️ Заполнить вручную', `manual_fill_${draftId}`)], [Markup.button.callback('🔄 Попробовать другие фото', 'retry_ocr')], [Markup.button.callback('❌ Отменить', 'action_cancel')]]));
+    const sessionState = stateManager.getStateByUserId(groupData.userId);
+    if (sessionState) sessionState.awaitingInput = null;
+  }
+}
+module.exports = {};
