@@ -13,6 +13,18 @@ console.log('Time:', new Date().toLocaleString());
 
 // ========== ЗАГРУЗКА ОБРАБОТЧИКОВ ==========
 try { require('./bot/commands/start'); console.log('✅ start.js loaded'); } catch (e) { console.error('❌ start.js:', e.message); }
+// --- ПОЛНАЯ ПРОВЕРКА ---
+const fs = require('fs');
+const path = require('path');
+try {
+  const fileContent = fs.readFileSync(path.join(__dirname, 'bot/handlers/callback.js'), 'utf8');
+  console.log("START_OF_CALLBACK_FILE");
+  console.log(fileContent);
+  console.log("END_OF_CALLBACK_FILE");
+} catch (e) {
+  console.log("READ_ERROR:", e.message);
+}
+// -----------------------
 try { require('./bot/handlers/callback'); console.log('✅ callback.js loaded'); } catch (e) { console.error('❌ callback.js:', e.message); }
 try { require('./bot/handlers/drafts'); console.log('✅ drafts.js loaded'); } catch (e) { console.error('❌ drafts.js:', e.message); }
 try { require('./bot/handlers/templates'); console.log('✅ templates.js loaded'); } catch (e) { console.error('❌ templates.js:', e.message); }
